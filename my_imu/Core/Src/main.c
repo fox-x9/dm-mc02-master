@@ -115,18 +115,22 @@ static uint64_t IMU_ExtendTimestamp(uint32_t raw_timestamp)
   return extended_timestamp_us;
 }
 
-static void IMU_UpdateLowPass(const IMU_Sample *sample, uint64_t timestamp_us)
+static void IMU_ConvertAcceleration(const IMU_Sample *sample, float accel[3])
 {
-  float accel[3];
-  float dt_s;
-  float rc;
-  float alpha;
   uint8_t axis;
 
   for (axis = 0; axis < 3; axis++)
   {
     accel[axis] = sample->accel_raw[axis] * BMI088_ACCEL_6G_SEN;
   }
+}
+
+static void IMU_UpdateLowPass(const float accel[3], uint64_t timestamp_us)
+{
+  float dt_s;
+  float rc;
+  float alpha;
+  uint8_t axis;
 
   if (!low_pass_initialized)
   {
@@ -283,6 +287,7 @@ int main(void)
             IMU_Sample sample;
             uint16_t tail = imu_ring_tail;
             uint64_t timestamp_us;
+            float accel_mps2[3];
 
             sample.timestamp_us = imu_ring[tail].timestamp_us;
             sample.accel_raw[0] = imu_ring[tail].accel_raw[0];
@@ -292,8 +297,9 @@ int main(void)
             imu_ring_tail = (tail + 1U) & IMU_RING_MASK;
 
             timestamp_us = IMU_ExtendTimestamp(sample.timestamp_us);
-            IMU_UpdateLowPass(&sample, timestamp_us);
-            UART_BSP_SendImuSample(timestamp_us, sample.accel_raw);
+            IMU_ConvertAcceleration(&sample, accel_mps2);
+            IMU_UpdateLowPass(accel_mps2, timestamp_us);
+            UART_BSP_SendAcceleration(accel_mps2);
             processed_sample = 1;
         }
 
