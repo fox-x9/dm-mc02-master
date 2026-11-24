@@ -1,0 +1,29 @@
+# Keil user interface and local workspace files
+*.uvguix
+*.uvguix.*
+*.log
+*.bak
+*.tmp
+.vs/
+.vscode/
+
+# Keil build intermediates
+*.o
+*.obj
+*.d
+*.crf
+*.axf
+*.map
+*.lst
+*.dep
+*.lnp
+*.sct
+*.htm
+*.__i
+*._ia
+*.build_log.*
+
+# OS-generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
