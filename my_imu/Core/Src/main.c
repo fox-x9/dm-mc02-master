@@ -63,6 +63,7 @@ void SystemClock_Config(void);
 #define IMU_RING_MASK        (IMU_RING_SIZE - 1U)
 #define IMU_LOW_PASS_HZ      2.0f
 #define LCD_REFRESH_MS       200U
+#define UART_OUTPUT_DIVIDER  8U
 #define TIMER_CLOCK_HZ       240000000U
 #define TIM2_TICKS_PER_US    (TIMER_CLOCK_HZ / 1000000U)
 
@@ -276,6 +277,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint32_t last_display_tick = HAL_GetTick() - LCD_REFRESH_MS;
+  uint8_t uart_output_divider = 0;
   while (1)
   {
     /* USER CODE END WHILE */
@@ -299,7 +301,11 @@ int main(void)
             timestamp_us = IMU_ExtendTimestamp(sample.timestamp_us);
             IMU_ConvertAcceleration(&sample, accel_mps2);
             IMU_UpdateLowPass(accel_mps2, timestamp_us);
-            UART_BSP_SendAcceleration(accel_mps2);
+            if (++uart_output_divider >= UART_OUTPUT_DIVIDER)
+            {
+                uart_output_divider = 0;
+                UART_BSP_SendAcceleration(accel_mps2);
+            }
             processed_sample = 1;
         }
 
