@@ -30,6 +30,9 @@ STM32H723VGTx 控制板 Keil MDK 例程集合。
 
 `my_imu` 使用 STM32H723 + BMI088 + ST7789：
 
+详细接线、串口协议、参数和构建说明见
+[my_imu/README.md](my_imu/README.md)。
+
 - BMI088 加速度计 `±6 g`、`1600 Hz` DRDY 采样。
 - 屏幕显示 `2 Hz` 低通后的三轴加速度。
 - USART1 使用 PA9(TX)/PA10(RX)，`921600 8N1`。
