@@ -3,7 +3,7 @@
 
 #include "main.h"
 
-#define UART_BSP_OUTPUT_RATE_HZ  250U
+#define UART_BSP_OUTPUT_RATE_HZ  500U
 
 void UART_BSP_Init(void);
 void UART_BSP_SendAcceleration(uint64_t timestamp_us, const float accel_mps2[3]);

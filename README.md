@@ -35,9 +35,9 @@ STM32H723VGTx 控制板 Keil MDK 例程集合。
 
 - BMI088 加速度计 `±6 g`、`1600 Hz` DRDY 采样。
 - 屏幕显示 `2 Hz` 低通后的三轴加速度。
-- USART1 使用 PA9(TX)/PA10(RX)，`115200 8N1`。
-- VOFA+ FireWater 串口数据格式：`ax,ay,az\n`，保留三位小数。
-- 内部采样为 `1600 Hz`，FireWater 串口输出为 `250 Hz`。
+- USB-C CDC 虚拟串口使用 PA11/PA12，USB Full-Speed。
+- VOFA+ FireWater 数据格式：`ax,ay,az\n`，保留三位小数。
+- 内部采样和 USB CDC 输出均为 `1600 Hz`。
 
 ## 构建
 

@@ -2,8 +2,8 @@
 
 基于 STM32H723VGTx、BMI088 六轴 IMU 和 ST7789 SPI 屏的桨叶动平衡仪原型。
 
-工程当前版本使用 `1600 Hz` DRDY 中断采集加速度计数据，通过 USART1
-以 `250 Hz` 输出 VOFA+ FireWater 格式的三轴加速度；LCD 只显示
+工程当前版本使用 `1600 Hz` DRDY 中断采集加速度计数据，通过 USB-C
+虚拟串口以 `1600 Hz` 输出 VOFA+ FireWater 格式的三轴加速度；LCD 只显示
 `2 Hz` 低通后的三轴低频加速度，避免屏幕刷新影响高频采集。
 
 ## 功能
@@ -13,7 +13,7 @@
 - 加速度计 DRDY 上升沿触发采样
 - `TIM2` 提供 `1 µs` 分辨率时间戳
 - `512` 个样本的环形缓冲区
-- USART1 以 `250 Hz` 输出 FireWater 兼容的三轴加速度 CSV 数据
+- USB-C CDC 虚拟串口以 `1600 Hz` 输出 FireWater 三轴加速度数据
 - LCD 显示 `2 Hz` 低通后的 X、Y、Z 加速度
 - LCD 同时显示实测采样率和环形缓冲区丢样数
 
@@ -35,7 +35,7 @@ EXTI15_10 interrupt
              +-----------+-----------+
              |                       |
              v                       v
-      USART1 高频输出          2 Hz 低通滤波
+      USB-C CDC 高频输出        2 Hz 低通滤波
       ax,ay,az\n                     |
                                      v
                               ST7789 LCD
@@ -75,27 +75,40 @@ BMI088 的加速度计和陀螺仪共用 SPI2，但使用独立片选。当前�
 LCD 驱动使用横屏模式，分辨率为 `280 × 240`。SPI1 工作在约
 `30 Mbit/s`，SPI2 工作在约 `7.5 Mbit/s`。
 
-### USART1
+### USB-C
 
-| 功能 | STM32H723 引脚 | 外部连接 |
+| 功能 | STM32H723 引脚 | 说明 |
 | --- | --- | --- |
-| USART1_TX | PA9 | USB-TTL 的 RXD |
-| USART1_RX | PA10 | USB-TTL 的 TXD，可悬空 |
-| GND | GND | 必须与 USB-TTL 共地 |
+| USB_DM | PA11 | USB 数据负端 |
+| USB_DP | PA12 | USB 数据正端 |
+| USB_GND | GND | 随 USB-C 线连接 |
 
-串口参数：
+USB-C 接口连接到 STM32 的 USB_OTG_HS 外设，但当前配置为
+**Device Full-Speed**，USB 时钟源为 `HSI48`。Windows/Linux 会将其枚举为
+USB CDC 虚拟 COM 口。
 
-```text
-115200 baud
-8 data bits
-1 stop bit
-no parity
-no flow control
-```
+> USB-C 连接器本身不代表 USB High-Speed；实际链路速度由本板的
+> Full-Speed 配置决定。USB FS 标称速率为 `12 Mbit/s`，仍远高于
+> UART 115200。
 
-## VOFA+ FireWater 串口协议
+UART 代码仍保留作为后备，但当前 `main.c` 不初始化或发送 USART1。
 
-USART1 使用
+### 用大白话理解 USB-C 链路
+
+- **USB-C 是接口形状**，不等于 USB 3.x，也不自动代表 10 Gbit/s。
+- 这块板的 Type-C 数据脚接在 STM32 的 USB 外设上，当前跑的是
+  **USB 2.0 Full-Speed（12 Mbit/s）**。
+- **CDC 是 USB 里的一种“虚拟串口”功能**。电脑会把它识别成普通 COM 口，
+  所以 VOFA+、串口助手可以像使用 UART 一样使用它。
+- 使用 USB-C 时，不需要外接 USB-TTL，也不需要设置真实波特率。VOFA+
+  界面里的 `115200` 只是兼容字段，不会限制 USB 的实际速度。
+- ST-Link 负责调试和烧录；USB-C 负责给应用传输 IMU 数据，两者用途不同。
+- 当前 USB 输出是 1600 Hz，三路每行约 20 字节，总数据量远低于
+  USB Full-Speed 的承载能力。
+
+## VOFA+ FireWater 协议
+
+USB CDC 虚拟串口使用
 [FireWater](https://www.vofa.plus/plugin_detail/?name=firewater) CSV
 字符串协议。每个采样点输出一行：
 
@@ -116,21 +129,21 @@ USART1 使用
 - 每个通道保留三位小数。
 - 固件内部将 BMI088 的 `int16_t` 原始计数乘以
   `0.00179443359375`，对应 `±6 g` 量程。
-- 串口不再输出原始计数和时间戳，也没有启动表头。
+- USB 数据不包含原始计数、时间戳或启动表头。
 - 横坐标由 VOFA+ 按连续样本序号生成。
 
 在 VOFA+ 中依次设置：
 
-1. 数据源选择对应串口和 `115200` 波特率。
+1. 数据源选择设备枚举出的 USB CDC COM 口。
 2. 数据引擎选择 `FireWater`。
 3. 打开串口后，在图形控件中会看到三路加速度通道。
 
-IMU 仍以 `1600 Hz` 采样，FireWater 按 `4 ms` 时间片限制输出，因此串口
-输出率为 `250 Hz`。每行约 20–25 字节时，串口数据率约为 5–6.3 KB/s，低于
-115200 波特率 8N1 模式下的理论值 11.52 KB/s。
+FireWater 输出率与 IMU 采样率一致，为 `1600 Hz`。每行约 19–23 字节时，
+ASCII 数据率约为 30–37 KB/s。USB CDC 驱动使用双缓冲，每累计约 192 字节
+提交一次批量传输，避免对每个样本单独发起 USB 事务。
 
-降低串口输出率是为了保留 1600 Hz 的原始采样和 2 Hz 屏幕显示，同时避免
-低波特率下的阻塞发送导致环形缓冲区持续丢样。
+CDC 的波特率字段不限制真实 USB 吞吐量；在 VOFA+ 中可选择 `115200`
+作为兼容设置，实际传输由 USB Full-Speed 链路完成。
 
 ## LCD 显示
 
@@ -152,7 +165,7 @@ FS:1600Hz DROP:0
 - LCD 每 `200 ms` 刷新一次。
 - BMI088 初始化失败时，屏幕显示 `IMU ERROR: 0xXX`。
 
-该屏幕不用于显示高频振动波形。高频数据应通过串口采集，并在 PC 端进行
+该屏幕不用于显示高频振动波形。高频数据应通过 USB-C 采集，并在 PC 端进行
 绘图、频谱分析或阶次分析。
 
 ## 工程结构
@@ -179,8 +192,15 @@ my_imu/
 │   ├── lcd.c
 │   ├── lcd.h
 │   ├── lcdfont.h
+│   ├── usb_bsp.c
+│   ├── usb_bsp.h
 │   ├── uart_bsp.c
 │   └── uart_bsp.h
+├── USB_DEVICE/
+│   ├── App/
+│   └── Target/
+├── Middlewares/
+│   └── ST/STM32_USB_Device_Library/
 ├── MDK-ARM/
 │   ├── my_imu.uvprojx
 │   └── my_imu/my_imu.hex
@@ -192,8 +212,11 @@ my_imu/
 
 - [main.c](./Core/Src/main.c)：DRDY 采样、环形缓冲区、时间戳和 LCD 低通显示
 - [BMI088driver.c](./Device/BMI088/BMI088driver.c)：BMI088 初始化、量程/输出率配置和原始数据读取
-- [usart.c](./Core/Src/usart.c)：USART1 外设配置
-- [uart_bsp.c](./User/uart_bsp.c)：FireWater 三通道数据帧发送
+- [usb_bsp.c](./User/usb_bsp.c)：FireWater 格式化、双缓冲和 CDC 批量发送
+- [usb_device.c](./USB_DEVICE/App/usb_device.c)：USB CDC 设备初始化
+- [usbd_cdc_if.c](./USB_DEVICE/App/usbd_cdc_if.c)：CDC 端点接口
+- [usbd_conf.c](./USB_DEVICE/Target/usbd_conf.c)：USB PCD 底层适配
+- [usart.c](./Core/Src/usart.c)：保留的 USART1 后备配置
 - [lcd.c](./User/lcd.c)：ST7789 LCD 驱动
 - [my_imu.ioc](./my_imu.ioc)：STM32CubeMX 引脚和外设配置
 
@@ -232,8 +255,9 @@ Cortex-M7
 | 环形缓冲区深度 | `Core/Src/main.c` | `512` 样本 |
 | 显示低通截止频率 | `Core/Src/main.c` | `2 Hz` |
 | LCD 刷新周期 | `Core/Src/main.c` | `200 ms` |
-| FireWater 输出率 | `User/uart_bsp.c` | `250 Hz` |
-| USART1 波特率 | `Core/Src/usart.c` | `115200` |
+| FireWater 输出率 | `User/usb_bsp.h` | `1600 Hz` |
+| USB 模式 | `USB_DEVICE/Target/usbd_conf.c` | Device Full-Speed |
+| USB 数据类 | `USB_DEVICE/App/usb_device.c` | CDC 虚拟串口 |
 
 如果 `±6 g` 仍然饱和，可继续改为 `±12 g` 或 `±24 g`。修改时必须同步更新：
 
@@ -260,7 +284,7 @@ VOFA+ 可以直接显示三轴时域曲线；导出数据后，PC 端还可以�
 ## 当前限制
 
 - 仅进行传感器读取、滤波和显示，没有零偏、轴间误差或温漂标定。
-- 串口发送换算后的三轴加速度，不包含时间戳或陀螺仪数据。
+- USB 发送换算后的三轴加速度，不包含时间戳或陀螺仪数据。
 - 未输出陀螺仪数据。
 - 未实现 FFT、不平衡幅值、相位或配重计算。
 - LCD 只显示低频信息，不能用于观察完整的高频振动波形。

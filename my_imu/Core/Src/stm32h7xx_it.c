@@ -58,6 +58,7 @@
 extern DMA_HandleTypeDef hdma_spi2_rx;
 extern DMA_HandleTypeDef hdma_spi2_tx;
 extern SPI_HandleTypeDef hspi2;
+extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -249,6 +250,14 @@ void EXTI15_10_IRQHandler(void)
 {
   HAL_GPIO_EXTI_IRQHandler(ACC_INT_Pin);
   HAL_GPIO_EXTI_IRQHandler(GYRO_INT_Pin);
+}
+
+/**
+  * @brief This function handles USB On-The-Go HS global interrupt.
+  */
+void OTG_HS_IRQHandler(void)
+{
+  HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
 }
 
 /* USER CODE BEGIN 1 */

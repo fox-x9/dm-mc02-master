@@ -27,7 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "BMI088driver.h"
 #include "lcd.h"
-#include "uart_bsp.h"
+#include "usb_bsp.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -252,7 +252,7 @@ int main(void)
   MX_SPI1_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-    UART_BSP_Init();
+    USB_BSP_Init();
     LCD_Init();
     LCD_Fill(0, 0, LCD_W, LCD_H, BLACK);
     LCD_ShowString(32, 12, (const uint8_t *)"BMI088 LPF m/s^2", CYAN, BLACK, 24, 0);
@@ -299,7 +299,7 @@ int main(void)
             timestamp_us = IMU_ExtendTimestamp(sample.timestamp_us);
             IMU_ConvertAcceleration(&sample, accel_mps2);
             IMU_UpdateLowPass(accel_mps2, timestamp_us);
-            UART_BSP_SendAcceleration(timestamp_us, accel_mps2);
+            USB_BSP_SendAcceleration(accel_mps2);
             processed_sample = 1;
         }
 
@@ -344,8 +344,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_HSI48;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 2;
