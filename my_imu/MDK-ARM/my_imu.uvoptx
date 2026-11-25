@@ -589,7 +589,7 @@
   </Group>
 
   <Group>
-    <GroupName>Device</GroupName>
+    <GroupName>Bsp/BMI088</GroupName>
     <tvExp>1</tvExp>
     <tvExpOptDlg>0</tvExpOptDlg>
     <cbSel>0</cbSel>
@@ -601,7 +601,7 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\Device\BMI088\BMI088driver.c</PathWithFileName>
+      <PathWithFileName>..\Bsp\BMI088\BMI088driver.c</PathWithFileName>
       <FilenameWithoutPath>BMI088driver.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
@@ -613,7 +613,7 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\Device\BMI088\BMI088Middleware.c</PathWithFileName>
+      <PathWithFileName>..\Bsp\BMI088\BMI088Middleware.c</PathWithFileName>
       <FilenameWithoutPath>BMI088Middleware.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
@@ -625,7 +625,7 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\Device\BMI088\inc\BMI088reg.h</PathWithFileName>
+      <PathWithFileName>..\Bsp\BMI088\inc\BMI088reg.h</PathWithFileName>
       <FilenameWithoutPath>BMI088reg.h</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>

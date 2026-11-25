@@ -18,10 +18,10 @@ set(APP_SOURCES
     Core/Src/stm32h7xx_hal_msp.c
     Core/Src/stm32h7xx_it.c
     Core/Src/system_stm32h7xx.c
-    Device/BMI088/BMI088driver.c
-    Device/BMI088/BMI088Middleware.c
-    Devices/WS2812/ws2812.c
-    User/usb_bsp.c
+    Bsp/BMI088/BMI088driver.c
+    Bsp/BMI088/BMI088Middleware.c
+    Bsp/WS2812/ws2812.c
+    App/usb_bsp.c
     USB_DEVICE/App/usb_device.c
     USB_DEVICE/App/usbd_cdc_if.c
     USB_DEVICE/App/usbd_desc.c
@@ -74,10 +74,10 @@ target_compile_definitions(my_imu.elf PRIVATE
 
 target_include_directories(my_imu.elf PRIVATE
     Core/Inc
-    Device/BMI088/inc
-    Device/BMI088
-    Devices/WS2812/inc
-    User
+    Bsp/BMI088/inc
+    Bsp/BMI088
+    Bsp/WS2812/inc
+    App
     Drivers/STM32H7xx_HAL_Driver/Inc
     Drivers/STM32H7xx_HAL_Driver/Inc/Legacy
     Drivers/CMSIS/Device/ST/STM32H7xx/Include

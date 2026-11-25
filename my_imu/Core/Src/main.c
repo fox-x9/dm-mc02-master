@@ -44,7 +44,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define IMU_OUTPUT_RATE_HZ   500U
+#define IMU_OUTPUT_RATE_HZ   1600U
 #define IMU_PERIOD_US        (1000000U / IMU_OUTPUT_RATE_HZ)
 #define TIM2_CLOCK_HZ        240000000U
 #define TIM2_TICKS_PER_US    (TIM2_CLOCK_HZ / 1000000U)

@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32H723xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Device/BMI088/inc;../Device/BMI088;../Devices/WS2812/inc;../User;../USB_DEVICE/App;../USB_DEVICE/Target;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Bsp/BMI088/inc;../Bsp/BMI088;../Bsp/WS2812/inc;../App;../USB_DEVICE/App;../USB_DEVICE/Target;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -553,37 +553,37 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>Device</GroupName>
+          <GroupName>Bsp/BMI088</GroupName>
           <Files>
             <File>
               <FileName>BMI088driver.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Device\BMI088\BMI088driver.c</FilePath>
+              <FilePath>..\Bsp\BMI088\BMI088driver.c</FilePath>
             </File>
             <File>
               <FileName>BMI088Middleware.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Device\BMI088\BMI088Middleware.c</FilePath>
+              <FilePath>..\Bsp\BMI088\BMI088Middleware.c</FilePath>
             </File>
             <File>
               <FileName>BMI088reg.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Device\BMI088\inc\BMI088reg.h</FilePath>
+              <FilePath>..\Bsp\BMI088\inc\BMI088reg.h</FilePath>
             </File>
           </Files>
         </Group>
         <Group>
-          <GroupName>Devices/WS2812</GroupName>
+          <GroupName>Bsp/WS2812</GroupName>
           <Files>
             <File>
               <FileName>ws2812.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Devices\WS2812\ws2812.c</FilePath>
+              <FilePath>..\Bsp\WS2812\ws2812.c</FilePath>
             </File>
             <File>
               <FileName>ws2812.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Devices\WS2812\inc\ws2812.h</FilePath>
+              <FilePath>..\Bsp\WS2812\inc\ws2812.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -638,17 +638,17 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>USB_BSP</GroupName>
+          <GroupName>App</GroupName>
           <Files>
             <File>
               <FileName>usb_bsp.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../User/usb_bsp.c</FilePath>
+              <FilePath>../App/usb_bsp.c</FilePath>
             </File>
             <File>
               <FileName>usb_bsp.h</FileName>
               <FileType>5</FileType>
-              <FilePath>../User/usb_bsp.h</FilePath>
+              <FilePath>../App/usb_bsp.h</FilePath>
             </File>
           </Files>
         </Group>

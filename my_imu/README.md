@@ -2,8 +2,8 @@
 
 STM32H723VGTx + BMI088 三轴加速度采集工程。当前调试模式：
 
-- BMI088 加速度计配置为 `800 Hz`
-- USB 输出率固定为 `500 Hz`
+- BMI088 加速度计配置为 `1600 Hz`
+- USB 输出率固定为 `1600 Hz`
 - 通过 USB-C CDC 虚拟串口发送 X/Y/Z 三轴加速度
 - 板载 WS2812 使用绿色 `1 Hz` 心跳指示系统运行
 - LCD 不初始化、不刷新
@@ -38,7 +38,7 @@ TIM2 2 ms period
 main loop -> USB-C CDC -> JustFloat(ax, ay, az)
 ```
 
-TIM2 以 1 MHz 计数，主循环每 2 ms 读取一次最新加速度并通过 USB 发送。
+TIM2 以 1 MHz 计数，主循环每 625 us 读取一次最新加速度并通过 USB 发送。
 
 ## 状态灯
 
@@ -65,14 +65,26 @@ WS2812 由 `SPI6_MOSI (PA7)` 驱动，5V 可控电源由 `PC15` 使能。
 当前只初始化加速度计所需的 SPI2 和中断，不初始化 LCD 使用的 SPI1、LCD
 控制和背光引脚。
 
-## 主要文件
+## 目录结构
 
-- `Core/Src/main.c`：TIM2 定时采样、USB 发送和 LED 心跳
-- `Device/BMI088/BMI088driver.c`：BMI088 初始化、`±6 g` 量程和 `800 Hz` 采样率
-- `User/usb_bsp.c`：JustFloat 组帧和 CDC 发送
-- `Devices/WS2812/ws2812.c`：SPI6 驱动 WS2812
+```text
+my_imu/
+├── App/                 USB 数据组帧
+├── Bsp/
+│   ├── BMI088/          IMU 驱动
+│   └── WS2812/          状态灯驱动
+├── Core/                CubeMX 应用和 HAL 配置
+├── USB_DEVICE/          USB CDC 应用与底层适配
+├── Middlewares/         STM32 USB Device Library
+├── Drivers/             STM32H7 HAL/CMSIS
+├── cmake/               GCC 工具链、启动文件和链接脚本
+├── MDK-ARM/             Keil 工程
+├── CMakeLists.txt
+├── CMakePresets.json
+└── README.md
+```
 
-没有为本次功能新增源文件或目录。
+LCD 驱动已从当前 USB-C IMU 工程移除，需要屏幕功能时可从 Git 历史恢复。
 
 ## 编译与烧录
 
