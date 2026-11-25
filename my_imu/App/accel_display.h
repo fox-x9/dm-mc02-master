@@ -2,6 +2,7 @@
 #define MY_IMU_ACCEL_DISPLAY_H
 
 void AccelDisplay_Init(void);
-void AccelDisplay_Update(const float accel_mps2[3]);
+void AccelDisplay_ProcessSample(const float accel_mps2[3]);
+void AccelDisplay_Update(void);
 
 #endif

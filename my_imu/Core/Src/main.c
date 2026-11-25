@@ -62,7 +62,6 @@
 static volatile int16_t imu_accel_raw[IMU_RING_SIZE][3];
 static volatile uint16_t imu_ring_head;
 static volatile uint16_t imu_ring_tail;
-static float last_accel_mps2[3];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -182,9 +181,7 @@ int main(void)
             accel_mps2[1] = accel_raw[1] * BMI088_ACCEL_6G_SEN;
             accel_mps2[2] = accel_raw[2] * BMI088_ACCEL_6G_SEN;
 
-            last_accel_mps2[0] = accel_mps2[0];
-            last_accel_mps2[1] = accel_mps2[1];
-            last_accel_mps2[2] = accel_mps2[2];
+            AccelDisplay_ProcessSample(accel_mps2);
             USB_BSP_SendAcceleration(accel_mps2);
         }
 
@@ -198,7 +195,7 @@ int main(void)
         if ((HAL_GetTick() - lcd_tick) >= LCD_REFRESH_MS)
         {
             lcd_tick = HAL_GetTick();
-            AccelDisplay_Update(last_accel_mps2);
+            AccelDisplay_Update();
         }
 
   }
