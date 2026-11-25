@@ -89,7 +89,7 @@ int main(void)
   MX_TIM12_Init();
   /* USER CODE BEGIN 2 */
 	HAL_TIM_PWM_Start(&htim12, TIM_CHANNEL_2);
-	TIM12->CCR2 = 50;
+	TIM12->CCR2 = 1250;
   /* USER CODE END 2 */
 
   /* Infinite loop */
