@@ -95,7 +95,15 @@ uint8_t UserRxBufferHS[APP_RX_DATA_SIZE];
 uint8_t UserTxBufferHS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
-
+static volatile uint8_t cdc_data_channel_open;
+static volatile uint8_t cdc_line_coding_received;
+static USBD_CDC_LineCodingTypeDef cdc_line_coding =
+{
+  115200U,
+  0U,
+  0U,
+  8U
+};
 /* USER CODE END PRIVATE_VARIABLES */
 
 /**
@@ -154,6 +162,8 @@ USBD_CDC_ItfTypeDef USBD_Interface_fops_HS =
 static int8_t CDC_Init_HS(void)
 {
   /* USER CODE BEGIN 8 */
+  cdc_data_channel_open = 0U;
+  cdc_line_coding_received = 0U;
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceHS, UserTxBufferHS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceHS, UserRxBufferHS);
@@ -169,6 +179,8 @@ static int8_t CDC_Init_HS(void)
 static int8_t CDC_DeInit_HS(void)
 {
   /* USER CODE BEGIN 9 */
+  cdc_data_channel_open = 0U;
+  cdc_line_coding_received = 0U;
   return (USBD_OK);
   /* USER CODE END 9 */
 }
@@ -223,15 +235,21 @@ static int8_t CDC_Control_HS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
   /* 6      | bDataBits  |   1   | Number Data bits (5, 6, 7, 8 or 16).          */
   /*******************************************************************************/
   case CDC_SET_LINE_CODING:
-
+    cdc_line_coding = *(USBD_CDC_LineCodingTypeDef *)pbuf;
+    cdc_line_coding_received = 1U;
     break;
 
   case CDC_GET_LINE_CODING:
-
+    *(USBD_CDC_LineCodingTypeDef *)pbuf = cdc_line_coding;
     break;
 
   case CDC_SET_CONTROL_LINE_STATE:
-
+  {
+    const USBD_SetupReqTypedef *request =
+        (const USBD_SetupReqTypedef *)pbuf;
+    cdc_data_channel_open =
+        ((request->wValue & 0x0001U) != 0U) ? 1U : 0U;
+  }
     break;
 
   case CDC_SEND_BREAK:
@@ -300,6 +318,12 @@ uint8_t CDC_TransmitReady_HS(void)
     return 0U;
   }
   return (hcdc->TxState == 0U) ? 1U : 0U;
+}
+
+uint8_t CDC_DataChannelOpen_HS(void)
+{
+  return (cdc_data_channel_open != 0U ||
+          cdc_line_coding_received != 0U) ? 1U : 0U;
 }
 
 /**

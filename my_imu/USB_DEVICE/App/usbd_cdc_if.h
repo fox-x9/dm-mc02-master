@@ -109,7 +109,7 @@ uint8_t CDC_Transmit_HS(uint8_t* Buf, uint16_t Len);
 uint8_t CDC_TransmitReady_HS(void);
 
 /* USER CODE BEGIN EXPORTED_FUNCTIONS */
-
+uint8_t CDC_DataChannelOpen_HS(void);
 /* USER CODE END EXPORTED_FUNCTIONS */
 
 /**
