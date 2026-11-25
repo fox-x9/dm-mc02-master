@@ -76,6 +76,41 @@ WS2812 由 `SPI6_MOSI (PA7)` 驱动，5V 可控电源由 `PC15` 使能。
 
 ## 编译与烧录
 
+### GCC + CMake + Ninja（推荐）
+
+工程使用 STM32Cube 扩展自带的 GNU Arm GCC、CMake 和 Ninja：
+
+```text
+GCC 13.3.1
+CMake 4.4.3
+Ninja 1.13.2
+```
+
+首次配置：
+
+```powershell
+$cmake = "$env:LOCALAPPDATA\stm32cube\bundles\cmake\4.4.3+st.1\bin\cmake.exe"
+& $cmake --preset gcc-debug
+```
+
+编译：
+
+```powershell
+& $cmake --build --preset gcc-debug
+```
+
+输出文件：
+
+```text
+build/gcc-debug/my_imu.hex
+build/gcc-debug/my_imu.bin
+```
+
+`CMakePresets.json` 已经配置当前计算机的 GCC 和 Ninja 路径。Ninja 只重新编译
+发生变化的文件，无改动时构建约 `0.1 s`。
+
+### Keil MDK
+
 Keil 工程：
 
 ```text

@@ -7,6 +7,13 @@
 .vs/
 .vscode/
 
+# CMake/Ninja local build tree
+my_imu/build/
+
+# Project-local editor configuration
+!my_imu/.vscode/
+!my_imu/.vscode/settings.json
+
 # Keil build intermediates
 *.o
 *.obj
