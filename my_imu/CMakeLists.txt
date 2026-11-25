@@ -20,7 +20,9 @@ set(APP_SOURCES
     Core/Src/system_stm32h7xx.c
     Bsp/BMI088/BMI088driver.c
     Bsp/BMI088/BMI088Middleware.c
+    Bsp/LCD/lcd.c
     Bsp/WS2812/ws2812.c
+    App/accel_display.c
     App/usb_bsp.c
     USB_DEVICE/App/usb_device.c
     USB_DEVICE/App/usbd_cdc_if.c
@@ -76,6 +78,7 @@ target_include_directories(my_imu.elf PRIVATE
     Core/Inc
     Bsp/BMI088/inc
     Bsp/BMI088
+    Bsp/LCD
     Bsp/WS2812/inc
     App
     Drivers/STM32H7xx_HAL_Driver/Inc

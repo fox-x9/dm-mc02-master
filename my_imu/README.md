@@ -1,56 +1,66 @@
 # my_imu
 
-STM32H723VGTx + BMI088 三轴加速度采集工程。当前调试模式：
+STM32H723VGTx + BMI088 三轴加速度采集工程。
 
-- BMI088 加速度计配置为 `1600 Hz`
-- USB 输出率固定为 `1600 Hz`
-- 通过 USB-C CDC 虚拟串口发送 X/Y/Z 三轴加速度
-- 板载 WS2812 使用绿色 `1 Hz` 心跳指示系统运行
-- LCD 不初始化、不刷新
-- 不输出陀螺仪数据
+- BMI088 加速度计采样率：`1600 Hz`
+- USB-C CDC 输出：X/Y/Z 三个 `float`，VOFA+ `JustFloat`
+- LCD：分别显示 X/Y/Z 三轴加速度绝对值和强度条
+- LCD 刷新率：`10 Hz`
+- WS2812：绿色 `1 Hz` 心跳表示系统运行
+- 不采集、不输出陀螺仪数据
 
 ## USB 输出
 
-USB-C 会枚举为 CDC 虚拟串口，数据采用与 ALL-VOFA 示例相同的
-VOFA+ `JustFloat` 二进制格式。每帧包含：
+USB-C 会枚举为 CDC 虚拟串口。每帧为 16 字节：
 
 ```text
 float ax + float ay + float az + 00 00 80 7F
 ```
 
-- 共 16 字节，依次为 X、Y、Z 轴加速度和帧尾
-- 单位：`m/s²`
+- 三轴单位均为 `m/s²`
 - 浮点数为 32 位 little-endian
-- 不包含表头、时间戳或陀螺仪数据
+- VOFA+ 数据引擎选择 `JustFloat`
+- 通道数选择 `3`
 
-USB CDC 的波特率字段不限制实际速率。使用 Type-C 数据线连接电脑即可，
-VOFA+ 中选择 `JustFloat` 和对应 COM 口。
+CDC 波特率字段不限制实际 USB 速率，VOFA+ 中可保留 `115200`。
 
 ## 数据流
 
 ```text
-TIM2 2 ms period
+TIM2 每 625 us 触发一次
         |
         v
-读取 BMI088 最新 ax/ay/az 原始值
+中断读取 BMI088 X/Y/Z 原始数据
         |
         v
-main loop -> USB-C CDC -> JustFloat(ax, ay, az)
+256 点环形缓冲区
+        |
+        +--> USB-C CDC -> VOFA+ JustFloat
+        |
+        +--> 10 Hz LCD 数值和强度条
 ```
 
-TIM2 以 1 MHz 计数，主循环每 625 us 读取一次最新加速度并通过 USB 发送。
+采样在 TIM2 中断中完成。即使 LCD 正在刷新，传感器采样也不会停止；主循环从
+环形缓冲区读取并发送数据。
+
+## LCD 显示
+
+- 逻辑分辨率：`280 x 240`，横屏
+- X、Y、Z 三行分别显示绝对加速度数值和红、绿、青三色强度条
+- 强度条量程：`0~60 m/s²`
+- 没有 USB 连接时仍可使用 LCD 单独观察三轴强度
+
+LCD 使用 SPI1，与 BMI088 的 SPI2 相互独立。
 
 ## 状态灯
 
 | 状态 | WS2812 |
 | --- | --- |
-| 初始化 | 蓝色常亮 |
+| 系统初始化 | 蓝色 |
 | 正常运行 | 绿色 1 Hz 闪烁 |
-| IMU 初始化失败 | 红色常亮 |
+| BMI088 初始化失败 | 红色常亮 |
 
-WS2812 由 `SPI6_MOSI (PA7)` 驱动，5V 可控电源由 `PC15` 使能。
-
-## 硬件连接
+## 外设引脚
 
 | 功能 | STM32H723 引脚 |
 | --- | --- |
@@ -58,56 +68,48 @@ WS2812 由 `SPI6_MOSI (PA7)` 驱动，5V 可控电源由 `PC15` 使能。
 | BMI088 SPI2_MISO | PC2_C |
 | BMI088 SPI2_MOSI | PC1 |
 | BMI088 ACC_CS | PC0 |
-| USB_DM | PA11 |
-| USB_DP | PA12 |
+| BMI088 GYRO_CS | PC3_C |
+| USB_DM / USB_DP | PA11 / PA12 |
 | WS2812 | PA7 / SPI6_MOSI |
-
-当前只初始化加速度计所需的 SPI2 和中断，不初始化 LCD 使用的 SPI1、LCD
-控制和背光引脚。
+| LCD SPI1_SCK | PB3 |
+| LCD SPI1_MOSI | PD7 |
+| LCD_CS | PE15 |
+| LCD_DC | PD10 |
+| LCD_RES | PB11 |
+| LCD_BLK | PB10 |
+| LCD/WS2812 5V 使能 | PC15 |
 
 ## 目录结构
 
 ```text
 my_imu/
-├── App/                 USB 数据组帧
+├── App/
+│   ├── accel_display.c/h    LCD 加速度界面
+│   └── usb_bsp.c/h          USB JustFloat 输出
 ├── Bsp/
-│   ├── BMI088/          IMU 驱动
-│   └── WS2812/          状态灯驱动
-├── Core/                CubeMX 应用和 HAL 配置
-├── USB_DEVICE/          USB CDC 应用与底层适配
-├── Middlewares/         STM32 USB Device Library
-├── Drivers/             STM32H7 HAL/CMSIS
-├── cmake/               GCC 工具链、启动文件和链接脚本
-├── MDK-ARM/             Keil 工程
+│   ├── BMI088/              IMU 驱动
+│   ├── LCD/                 ST7789 LCD 驱动
+│   └── WS2812/              状态灯驱动
+├── Core/                    CubeMX 应用与 HAL 配置
+├── USB_DEVICE/              USB CDC 应用与底层适配
+├── Middlewares/             STM32 USB Device Library
+├── Drivers/                 STM32H7 HAL/CMSIS
+├── cmake/                   GCC 启动文件、链接脚本和工具链
+├── MDK-ARM/                 Keil 工程
 ├── CMakeLists.txt
 ├── CMakePresets.json
 └── README.md
 ```
 
-LCD 驱动已从当前 USB-C IMU 工程移除，需要屏幕功能时可从 Git 历史恢复。
-
 ## 编译与烧录
 
 ### GCC + CMake + Ninja（推荐）
 
-工程使用 STM32Cube 扩展自带的 GNU Arm GCC、CMake 和 Ninja：
-
-```text
-GCC 13.3.1
-CMake 4.4.3
-Ninja 1.13.2
-```
-
-首次配置：
+使用 VS Code STM32Cube 扩展已有的 GNU Arm GCC、CMake 和 Ninja：
 
 ```powershell
 $cmake = "$env:LOCALAPPDATA\stm32cube\bundles\cmake\4.4.3+st.1\bin\cmake.exe"
 & $cmake --preset gcc-debug
-```
-
-编译：
-
-```powershell
 & $cmake --build --preset gcc-debug
 ```
 
@@ -118,9 +120,6 @@ build/gcc-debug/my_imu.hex
 build/gcc-debug/my_imu.bin
 ```
 
-`CMakePresets.json` 已经配置当前计算机的 GCC 和 Ninja 路径。Ninja 只重新编译
-发生变化的文件，无改动时构建约 `0.1 s`。
-
 ### Keil MDK
 
 Keil 工程：
@@ -129,21 +128,16 @@ Keil 工程：
 MDK-ARM/my_imu.uvprojx
 ```
 
-完整编译后生成：
+完整编译后输出：
 
 ```text
 MDK-ARM/my_imu/my_imu.hex
 ```
 
-烧录 `.hex` 时必须指定 Intel HEX 格式：
+烧录 `.hex` 必须指定 Intel HEX 格式：
 
 ```powershell
 & $stflash --freq 100 --connect-under-reset --format=ihex --reset write $hex
 ```
 
-调试阶段主循环保持运行，不进入 `WFI`。这样 H7 的 USB 枚举、CDC 中断和
-ST-Link 调试访问不会被 Sleep 状态干扰，正常烧录不需要反复拔插 USB-C。
-后续如增加低功耗模式，应单独验证 USB、调试休眠和唤醒时序。
-
-详细编译和 ST-Link 操作见
-[编译烧录流程.md](../编译烧录流程.md)。
+详细工具链与 ST-Link 操作见 [编译烧录流程.md](../编译烧录流程.md)。

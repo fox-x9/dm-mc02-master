@@ -63,6 +63,8 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
 /* USER CODE END EV */
 
+extern void IMU_TimerSampleISR(void);
+
 /******************************************************************************/
 /*           Cortex Processor Interruption and Exception Handlers          */
 /******************************************************************************/
@@ -200,6 +202,18 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32h7xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles TIM2 global interrupt.
+  */
+void TIM2_IRQHandler(void)
+{
+  if ((TIM2->SR & TIM_SR_UIF) != 0U)
+  {
+    TIM2->SR &= ~TIM_SR_UIF;
+    IMU_TimerSampleISR();
+  }
+}
 
 /**
   * @brief This function handles DMA1 stream0 global interrupt.

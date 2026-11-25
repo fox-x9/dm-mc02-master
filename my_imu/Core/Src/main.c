@@ -28,6 +28,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "BMI088driver.h"
+#include "accel_display.h"
 #include "usb_bsp.h"
 #include "ws2812.h"
 /* USER CODE END Includes */
@@ -46,16 +47,22 @@
 /* USER CODE BEGIN PM */
 #define IMU_OUTPUT_RATE_HZ   1600U
 #define IMU_PERIOD_US        (1000000U / IMU_OUTPUT_RATE_HZ)
+#define IMU_RING_SIZE        256U
+#define IMU_RING_MASK        (IMU_RING_SIZE - 1U)
 #define TIM2_CLOCK_HZ        240000000U
 #define TIM2_TICKS_PER_US    (TIM2_CLOCK_HZ / 1000000U)
 #define LED_HEARTBEAT_MS     500U
 #define LED_BRIGHTNESS       16U
+#define LCD_REFRESH_MS       100U
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static volatile int16_t imu_accel_raw[IMU_RING_SIZE][3];
+static volatile uint16_t imu_ring_head;
+static volatile uint16_t imu_ring_tail;
+static float last_accel_mps2[3];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,11 +78,32 @@ static void IMU_SampleTimer_Init(void)
   __HAL_RCC_TIM2_CLK_ENABLE();
   TIM2->CR1 = 0U;
   TIM2->PSC = TIM2_TICKS_PER_US - 1U;
-  TIM2->ARR = 0xFFFFFFFFU;
+  TIM2->ARR = IMU_PERIOD_US - 1U;
   TIM2->EGR = TIM_EGR_UG;
   TIM2->CNT = 0U;
   TIM2->SR = 0U;
+  TIM2->DIER = TIM_DIER_UIE;
+  HAL_NVIC_SetPriority(TIM2_IRQn, 1U, 0U);
+  HAL_NVIC_EnableIRQ(TIM2_IRQn);
   TIM2->CR1 = TIM_CR1_CEN;
+}
+
+void IMU_TimerSampleISR(void)
+{
+  int16_t accel_raw[3];
+  uint16_t next_head = (imu_ring_head + 1U) & IMU_RING_MASK;
+
+  if (next_head == imu_ring_tail)
+  {
+    return;
+  }
+
+  BMI088_read_acceleration(accel_raw);
+  imu_accel_raw[imu_ring_head][0] = accel_raw[0];
+  imu_accel_raw[imu_ring_head][1] = accel_raw[1];
+  imu_accel_raw[imu_ring_head][2] = accel_raw[2];
+  __DMB();
+  imu_ring_head = next_head;
 }
 /* USER CODE END 0 */
 
@@ -110,6 +138,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
     MX_SPI6_Init();
     MX_SPI2_Init();
+    MX_SPI1_Init();
 
     if (bmi088_accel_init() != BMI088_NO_ERROR)
     {
@@ -118,36 +147,44 @@ int main(void)
         Error_Handler();
     }
 
-    IMU_SampleTimer_Init();
     USB_BSP_Init();
     HAL_Delay(300U);
     HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_SET);
-    HAL_Delay(10U);
+    HAL_Delay(50U);
     WS2812_Ctrl(0U, LED_BRIGHTNESS, 0U);
+    AccelDisplay_Init();
+    IMU_SampleTimer_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t last_sample_us = TIM2->CNT;
   uint32_t led_tick = HAL_GetTick();
+  uint32_t lcd_tick = HAL_GetTick();
   uint8_t led_on = 1U;
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-        uint32_t now_us = TIM2->CNT;
-        if ((uint32_t)(now_us - last_sample_us) >= IMU_PERIOD_US)
+        while (imu_ring_tail != imu_ring_head)
         {
+            uint16_t tail = imu_ring_tail;
             int16_t accel_raw[3];
             float accel_mps2[3];
 
-            last_sample_us += IMU_PERIOD_US;
-            BMI088_read_acceleration(accel_raw);
+            accel_raw[0] = imu_accel_raw[tail][0];
+            accel_raw[1] = imu_accel_raw[tail][1];
+            accel_raw[2] = imu_accel_raw[tail][2];
+            __DMB();
+            imu_ring_tail = (tail + 1U) & IMU_RING_MASK;
+
             accel_mps2[0] = accel_raw[0] * BMI088_ACCEL_6G_SEN;
             accel_mps2[1] = accel_raw[1] * BMI088_ACCEL_6G_SEN;
             accel_mps2[2] = accel_raw[2] * BMI088_ACCEL_6G_SEN;
 
+            last_accel_mps2[0] = accel_mps2[0];
+            last_accel_mps2[1] = accel_mps2[1];
+            last_accel_mps2[2] = accel_mps2[2];
             USB_BSP_SendAcceleration(accel_mps2);
         }
 
@@ -156,6 +193,12 @@ int main(void)
             led_tick = HAL_GetTick();
             led_on ^= 1U;
             WS2812_Ctrl(0U, led_on ? LED_BRIGHTNESS : 0U, 0U);
+        }
+
+        if ((HAL_GetTick() - lcd_tick) >= LCD_REFRESH_MS)
+        {
+            lcd_tick = HAL_GetTick();
+            AccelDisplay_Update(last_accel_mps2);
         }
 
   }
