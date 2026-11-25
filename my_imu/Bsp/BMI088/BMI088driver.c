@@ -323,13 +323,19 @@ void BMI088_read(float gyro[3], float accel[3], float *temperate)
 /**
  * @brief Read the accelerometer channels only for high-rate sampling.
  * @param accel_raw Raw signed 16-bit acceleration counts.
+ *
+ * This function is called from the 1600 Hz TIM2 ISR. Keep it limited to one
+ * contiguous six-byte SPI read so its blocking time stays far below 625 us.
+ * BMI088 data registers use little-endian byte order.
  */
 void BMI088_read_acceleration(int16_t accel_raw[3])
 {
     uint8_t buf[6] = {0};
 
+    /* XOUT_L..ZOUT_H are contiguous, so one burst read keeps axes coherent. */
     BMI088_accel_read_muli_reg(BMI088_ACCEL_XOUT_L, buf, 6);
 
+    /* Recombine low/high bytes into signed raw counts for each axis. */
     accel_raw[0] = (int16_t)(((uint16_t)buf[1] << 8) | buf[0]);
     accel_raw[1] = (int16_t)(((uint16_t)buf[3] << 8) | buf[2]);
     accel_raw[2] = (int16_t)(((uint16_t)buf[5] << 8) | buf[4]);

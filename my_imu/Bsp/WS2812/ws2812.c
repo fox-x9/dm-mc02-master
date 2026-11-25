@@ -5,12 +5,15 @@
 
 void WS2812_Ctrl(uint8_t r, uint8_t g, uint8_t b)
 {
+    /* 24 RGB encoded bytes followed by 100 zero bytes for the reset latch. */
     uint8_t txbuf[124] = {0};
+    /* WS2812 wire order is GRB, MSB first for each color byte. */
     for (int i = 0; i < 8; i++)
     {
         txbuf[7-i]  = (((g>>i)&0x01) ? WS2812_HighLevel : WS2812_LowLevel)>>1;
         txbuf[15-i] = (((r>>i)&0x01) ? WS2812_HighLevel : WS2812_LowLevel)>>1;
         txbuf[23-i] = (((b>>i)&0x01) ? WS2812_HighLevel : WS2812_LowLevel)>>1;
     }
+    /* 100 trailing zero bytes provide the WS2812 reset/latch low period. */
     (void)HAL_SPI_Transmit(&WS2812_SPI_UNIT, txbuf, sizeof(txbuf), 0xFFFFU);
 }

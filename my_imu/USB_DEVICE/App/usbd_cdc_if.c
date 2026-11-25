@@ -89,12 +89,19 @@
 /* Create buffer for reception and transmission           */
 /* It's up to user to redefine and/or remove those define */
 /** Received data over USB are stored in this buffer      */
+/* 主机发往设备的数据缓冲区；当前工程只做发送，不解析上位机命令。 */
 uint8_t UserRxBufferHS[APP_RX_DATA_SIZE];
 
 /** Data to send over USB CDC are stored in this buffer   */
+/* CubeMX 提供的通用发送缓冲区；JustFloat 批量数据由 usb_bsp.c 管理。 */
 uint8_t UserTxBufferHS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
+/*
+ * CDC Line Coding 只是虚拟串口参数，不等于 USB 实际吞吐率。
+ * 某些主机打开端口时发送 SET_LINE_CODING，但不拉 DTR；另一些会拉 DTR。
+ * 因此两个信号分别记录，任一有效即可认为应用层已打开数据通道。
+ */
 static volatile uint8_t cdc_data_channel_open;
 static volatile uint8_t cdc_line_coding_received;
 static USBD_CDC_LineCodingTypeDef cdc_line_coding =
@@ -162,6 +169,7 @@ USBD_CDC_ItfTypeDef USBD_Interface_fops_HS =
 static int8_t CDC_Init_HS(void)
 {
   /* USER CODE BEGIN 8 */
+  /* 每次重新枚举 USB 时清除上一次的连接状态。 */
   cdc_data_channel_open = 0U;
   cdc_line_coding_received = 0U;
   /* Set Application Buffers */
@@ -179,6 +187,7 @@ static int8_t CDC_Init_HS(void)
 static int8_t CDC_DeInit_HS(void)
 {
   /* USER CODE BEGIN 9 */
+  /* USB 断开时立即停止应用层批量发送。 */
   cdc_data_channel_open = 0U;
   cdc_line_coding_received = 0U;
   return (USBD_OK);
@@ -195,6 +204,11 @@ static int8_t CDC_DeInit_HS(void)
 static int8_t CDC_Control_HS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 {
   /* USER CODE BEGIN 10 */
+  /*
+   * 处理 CDC 类请求。pbuf 的数据格式由 cmd 决定：
+   * - SET/GET_LINE_CODING 使用 7 字节 Line Coding；
+   * - SET_CONTROL_LINE_STATE 的请求参数放在 Setup 包的 wValue 中。
+   */
   switch(cmd)
   {
   case CDC_SEND_ENCAPSULATED_COMMAND:
@@ -235,16 +249,19 @@ static int8_t CDC_Control_HS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
   /* 6      | bDataBits  |   1   | Number Data bits (5, 6, 7, 8 or 16).          */
   /*******************************************************************************/
   case CDC_SET_LINE_CODING:
+    /* 保存主机设置的波特率、停止位、校验位和数据位。 */
     cdc_line_coding = *(USBD_CDC_LineCodingTypeDef *)pbuf;
     cdc_line_coding_received = 1U;
     break;
 
   case CDC_GET_LINE_CODING:
+    /* 主机查询时返回最近一次保存的参数，避免空响应。 */
     *(USBD_CDC_LineCodingTypeDef *)pbuf = cdc_line_coding;
     break;
 
   case CDC_SET_CONTROL_LINE_STATE:
   {
+    /* wValue bit0 为 DTR。VOFA+ 可能只发 Line Coding，因此不能仅依赖 DTR。 */
     const USBD_SetupReqTypedef *request =
         (const USBD_SetupReqTypedef *)pbuf;
     cdc_data_channel_open =
@@ -300,6 +317,10 @@ uint8_t CDC_Transmit_HS(uint8_t* Buf, uint16_t Len)
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 12 */
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceHS.pClassData;
+  /*
+   * USB 栈不复制 Buf；传输完成前调用者必须保持缓冲区内容不变。
+   * usb_bsp.c 通过 TxState 就绪检查保护其静态批次缓冲区。
+   */
   if (hcdc->TxState != 0){
     return USBD_BUSY;
   }
@@ -322,6 +343,7 @@ uint8_t CDC_TransmitReady_HS(void)
 
 uint8_t CDC_DataChannelOpen_HS(void)
 {
+  /* 兼容两类主机：显式 DTR，或仅发送 SET_LINE_CODING 后开始读取。 */
   return (cdc_data_channel_open != 0U ||
           cdc_line_coding_received != 0U) ? 1U : 0U;
 }

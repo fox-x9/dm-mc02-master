@@ -109,6 +109,9 @@ uint8_t CDC_Transmit_HS(uint8_t* Buf, uint16_t Len);
 uint8_t CDC_TransmitReady_HS(void);
 
 /* USER CODE BEGIN EXPORTED_FUNCTIONS */
+/**
+ * @brief 主机是否已通过 DTR 或 SET_LINE_CODING 打开 CDC 数据通道。
+ */
 uint8_t CDC_DataChannelOpen_HS(void);
 /* USER CODE END EXPORTED_FUNCTIONS */
 
