@@ -248,11 +248,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  USB_BSP_Init();
   MX_DMA_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-    USB_BSP_Init();
     LCD_Init();
     LCD_Fill(0, 0, LCD_W, LCD_H, BLACK);
     LCD_ShowString(32, 12, (const uint8_t *)"BMI088 LPF m/s^2", CYAN, BLACK, 24, 0);
@@ -270,6 +270,9 @@ int main(void)
     LCD_Fill(0, 194, LCD_W, LCD_H, BLACK);
 
     IMU_TimestampTimer_Init();
+    __HAL_GPIO_EXTI_CLEAR_IT(ACC_INT_Pin | GYRO_INT_Pin);
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
     imu_capture_enabled = 1;
   /* USER CODE END 2 */
 
