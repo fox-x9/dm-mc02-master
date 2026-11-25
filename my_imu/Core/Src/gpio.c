@@ -49,8 +49,8 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
-  /*Enable 5V output rail used by the WS2812 LED. */
-  HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_SET);
+  /* Keep the WS2812 5V rail off until after USB has enumerated. */
+  HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_RESET);
   GPIO_InitStruct.Pin = POWER_OUT5V_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;

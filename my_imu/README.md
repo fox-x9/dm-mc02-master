@@ -100,9 +100,9 @@ MDK-ARM/my_imu/my_imu.hex
 & $stflash --freq 100 --connect-under-reset --format=ihex --reset write $hex
 ```
 
-工程在进入 `WFI` 前调用 `HAL_DBGMCU_EnableDBGSleepMode()`，因此 H7 空闲休眠时
-仍允许 ST-Link 访问调试接口并执行软件复位，正常烧录不需要反复拔插 USB-C。
-如果 ST-Link 已连接 NRST，可以进一步提高连接失败时的恢复能力。
+调试阶段主循环保持运行，不进入 `WFI`。这样 H7 的 USB 枚举、CDC 中断和
+ST-Link 调试访问不会被 Sleep 状态干扰，正常烧录不需要反复拔插 USB-C。
+后续如增加低功耗模式，应单独验证 USB、调试休眠和唤醒时序。
 
 详细编译和 ST-Link 操作见
 [编译烧录流程.md](../编译烧录流程.md)。

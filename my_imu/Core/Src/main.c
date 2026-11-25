@@ -114,19 +114,18 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  HAL_DBGMCU_EnableDBGSleepMode();
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
-    USB_BSP_Init();
     MX_SPI6_Init();
     MX_SPI2_Init();
 
-    WS2812_Ctrl(0U, 0U, LED_BRIGHTNESS);
     if (bmi088_accel_init() != BMI088_NO_ERROR)
     {
+        HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_SET);
         WS2812_Ctrl(LED_BRIGHTNESS, 0U, 0U);
         Error_Handler();
     }
@@ -134,6 +133,10 @@ int main(void)
     __HAL_GPIO_EXTI_CLEAR_IT(ACC_INT_Pin);
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1U, 0U);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    USB_BSP_Init();
+    HAL_Delay(300U);
+    HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_SET);
+    HAL_Delay(10U);
     WS2812_Ctrl(0U, LED_BRIGHTNESS, 0U);
   /* USER CODE END 2 */
 
@@ -172,7 +175,7 @@ int main(void)
 
         if (!processed_sample)
         {
-            __WFI();
+            __NOP();
         }
   }
   /* USER CODE END 3 */
@@ -200,11 +203,8 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48 | RCC_OSCILLATORTYPE_HSI
-                                    | RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48 | RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
-  RCC_OscInitStruct.HSICalibrationValue = 64;
   RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
