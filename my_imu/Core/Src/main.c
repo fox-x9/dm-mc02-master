@@ -1,3 +1,7 @@
+
+
+
+
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -23,6 +27,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "BMI088driver.h"
+#include "usb_bsp.h"
 #include "ws2812.h"
 /* USER CODE END Includes */
 
@@ -38,13 +44,18 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define IMU_RING_SIZE        64U
+#define IMU_RING_MASK        (IMU_RING_SIZE - 1U)
+#define LED_HEARTBEAT_MS     500U
+#define LED_BRIGHTNESS       16U
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static volatile int16_t imu_accel_raw[IMU_RING_SIZE][3];
+static volatile uint16_t imu_ring_head;
+static volatile uint16_t imu_ring_tail;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,8 +66,29 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define WS2812_TEST_LEVEL  16U
-#define WS2812_TEST_DELAY  500U
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  int16_t accel_raw[3];
+  uint16_t next_head;
+
+  if (GPIO_Pin != ACC_INT_Pin)
+  {
+    return;
+  }
+
+  next_head = (imu_ring_head + 1U) & IMU_RING_MASK;
+  if (next_head == imu_ring_tail)
+  {
+    return;
+  }
+
+  BMI088_read_acceleration(accel_raw);
+  imu_accel_raw[imu_ring_head][0] = accel_raw[0];
+  imu_accel_raw[imu_ring_head][1] = accel_raw[1];
+  imu_accel_raw[imu_ring_head][2] = accel_raw[2];
+  __DMB();
+  imu_ring_head = next_head;
+}
 /* USER CODE END 0 */
 
 /**
@@ -82,36 +114,66 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  HAL_DBGMCU_EnableDBGSleepMode();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  // USB_BSP_Init();
   /* USER CODE BEGIN 2 */
+    USB_BSP_Init();
     MX_SPI6_Init();
+    MX_SPI2_Init();
 
-    // MX_DMA_Init();
-    // MX_SPI2_Init();
-    // while(BMI088_init() != BMI088_NO_ERROR) {}
-    WS2812_Ctrl(0U, 0U, 0U);
+    WS2812_Ctrl(0U, 0U, LED_BRIGHTNESS);
+    if (bmi088_accel_init() != BMI088_NO_ERROR)
+    {
+        WS2812_Ctrl(LED_BRIGHTNESS, 0U, 0U);
+        Error_Handler();
+    }
+
+    __HAL_GPIO_EXTI_CLEAR_IT(ACC_INT_Pin);
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1U, 0U);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    WS2812_Ctrl(0U, LED_BRIGHTNESS, 0U);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t led_tick = HAL_GetTick();
+  uint8_t led_on = 1U;
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-        WS2812_Ctrl(WS2812_TEST_LEVEL, 0U, 0U);
-        HAL_Delay(WS2812_TEST_DELAY);
-        WS2812_Ctrl(0U, WS2812_TEST_LEVEL, 0U);
-        HAL_Delay(WS2812_TEST_DELAY);
-        WS2812_Ctrl(0U, 0U, WS2812_TEST_LEVEL);
-        HAL_Delay(WS2812_TEST_DELAY);
-        WS2812_Ctrl(0U, 0U, 0U);
-        HAL_Delay(WS2812_TEST_DELAY);
+        uint8_t processed_sample = 0U;
+
+        while (imu_ring_tail != imu_ring_head)
+        {
+            uint16_t tail = imu_ring_tail;
+            float accel_mps2[3];
+
+            accel_mps2[0] = imu_accel_raw[tail][0] * BMI088_ACCEL_6G_SEN;
+            accel_mps2[1] = imu_accel_raw[tail][1] * BMI088_ACCEL_6G_SEN;
+            accel_mps2[2] = imu_accel_raw[tail][2] * BMI088_ACCEL_6G_SEN;
+            __DMB();
+            imu_ring_tail = (tail + 1U) & IMU_RING_MASK;
+
+            USB_BSP_SendAcceleration(accel_mps2);
+            processed_sample = 1U;
+        }
+
+        if ((HAL_GetTick() - led_tick) >= LED_HEARTBEAT_MS)
+        {
+            led_tick = HAL_GetTick();
+            led_on ^= 1U;
+            WS2812_Ctrl(0U, led_on ? LED_BRIGHTNESS : 0U, 0U);
+        }
+
+        if (!processed_sample)
+        {
+            __WFI();
+        }
   }
   /* USER CODE END 3 */
 }
@@ -138,15 +200,18 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_HSI48;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48 | RCC_OSCILLATORTYPE_HSI
+                                    | RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
+  RCC_OscInitStruct.HSICalibrationValue = 64;
   RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 2;
   RCC_OscInitStruct.PLL.PLLN = 40;
   RCC_OscInitStruct.PLL.PLLP = 1;
-  RCC_OscInitStruct.PLL.PLLQ = 2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
   RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_3;
   RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;

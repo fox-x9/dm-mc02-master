@@ -2,59 +2,19 @@
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
 
-#define USB_TX_BUFFER_SIZE     32U
+#define USB_FRAME_DATA_BYTES  (3U * sizeof(float))
+#define USB_FRAME_TAIL_BYTES  4U
+#define USB_FRAME_SIZE        (USB_FRAME_DATA_BYTES + USB_FRAME_TAIL_BYTES)
+
+typedef union
+{
+    float value;
+    uint8_t bytes[sizeof(float)];
+} USB_BSP_FloatBytes;
 
 extern USBD_HandleTypeDef hUsbDeviceHS;
 
-static uint8_t tx_buffer[USB_TX_BUFFER_SIZE];
-
-static uint16_t USB_BSP_AppendUnsigned(char *text, uint16_t index, uint32_t value)
-{
-    char digits[10];
-    uint8_t count = 0;
-
-    do
-    {
-        digits[count++] = (char)('0' + (value % 10U));
-        value /= 10U;
-    }
-    while (value != 0U);
-
-    while (count > 0U)
-    {
-        text[index++] = digits[--count];
-    }
-    return index;
-}
-
-static uint16_t USB_BSP_AppendFixed3(char *text, uint16_t index, float value)
-{
-    int32_t scaled;
-    uint32_t magnitude;
-    uint32_t whole;
-    uint32_t fraction;
-
-    scaled = (int32_t)((value >= 0.0f) ? (value * 1000.0f + 0.5f)
-                                       : (value * 1000.0f - 0.5f));
-    if (scaled < 0)
-    {
-        text[index++] = '-';
-        magnitude = (uint32_t)(-scaled);
-    }
-    else
-    {
-        magnitude = (uint32_t)scaled;
-    }
-
-    whole = magnitude / 1000U;
-    fraction = magnitude % 1000U;
-    index = USB_BSP_AppendUnsigned(text, index, whole);
-    text[index++] = '.';
-    text[index++] = (char)('0' + (fraction / 100U));
-    text[index++] = (char)('0' + ((fraction / 10U) % 10U));
-    text[index++] = (char)('0' + (fraction % 10U));
-    return index;
-}
+static uint8_t tx_buffer[USB_FRAME_SIZE];
 
 static uint8_t USB_BSP_IsReady(void)
 {
@@ -69,19 +29,28 @@ void USB_BSP_Init(void)
 
 void USB_BSP_SendAcceleration(const float accel_mps2[3])
 {
-    uint16_t index;
+    USB_BSP_FloatBytes sample;
+    uint8_t axis;
 
     if (!USB_BSP_IsReady() || !CDC_TransmitReady_HS())
     {
         return;
     }
 
-    index = 0;
-    index = USB_BSP_AppendFixed3((char *)tx_buffer, index, accel_mps2[0]);
-    tx_buffer[index++] = ',';
-    index = USB_BSP_AppendFixed3((char *)tx_buffer, index, accel_mps2[1]);
-    tx_buffer[index++] = ',';
-    index = USB_BSP_AppendFixed3((char *)tx_buffer, index, accel_mps2[2]);
-    tx_buffer[index++] = '\n';
-    (void)CDC_Transmit_HS(tx_buffer, index);
+    for (axis = 0U; axis < 3U; axis++)
+    {
+        sample.value = accel_mps2[axis];
+        tx_buffer[axis * sizeof(float) + 0U] = sample.bytes[0];
+        tx_buffer[axis * sizeof(float) + 1U] = sample.bytes[1];
+        tx_buffer[axis * sizeof(float) + 2U] = sample.bytes[2];
+        tx_buffer[axis * sizeof(float) + 3U] = sample.bytes[3];
+    }
+
+    /* VOFA+ JustFloat frame tail: 0x7F800000, little-endian on Cortex-M. */
+    tx_buffer[USB_FRAME_DATA_BYTES + 0U] = 0x00U;
+    tx_buffer[USB_FRAME_DATA_BYTES + 1U] = 0x00U;
+    tx_buffer[USB_FRAME_DATA_BYTES + 2U] = 0x80U;
+    tx_buffer[USB_FRAME_DATA_BYTES + 3U] = 0x7FU;
+
+    (void)CDC_Transmit_HS(tx_buffer, USB_FRAME_SIZE);
 }
