@@ -291,6 +291,17 @@ uint8_t CDC_Transmit_HS(uint8_t* Buf, uint16_t Len)
   return result;
 }
 
+uint8_t CDC_TransmitReady_HS(void)
+{
+  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceHS.pClassData;
+
+  if (hcdc == NULL)
+  {
+    return 0U;
+  }
+  return (hcdc->TxState == 0U) ? 1U : 0U;
+}
+
 /**
   * @brief  CDC_TransmitCplt_HS
   *         Data transmitted callback

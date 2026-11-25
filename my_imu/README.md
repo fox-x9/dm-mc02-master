@@ -88,10 +88,7 @@ USB-C 接口连接到 STM32 的 USB_OTG_HS 外设，但当前配置为
 USB CDC 虚拟 COM 口。
 
 > USB-C 连接器本身不代表 USB High-Speed；实际链路速度由本板的
-> Full-Speed 配置决定。USB FS 标称速率为 `12 Mbit/s`，仍远高于
-> UART 115200。
-
-UART 代码仍保留作为后备，但当前 `main.c` 不初始化或发送 USART1。
+> Full-Speed 配置决定。USB FS 标称速率为 `12 Mbit/s`。
 
 ### 用大白话理解 USB-C 链路
 
@@ -99,7 +96,7 @@ UART 代码仍保留作为后备，但当前 `main.c` 不初始化或发送 USAR
 - 这块板的 Type-C 数据脚接在 STM32 的 USB 外设上，当前跑的是
   **USB 2.0 Full-Speed（12 Mbit/s）**。
 - **CDC 是 USB 里的一种“虚拟串口”功能**。电脑会把它识别成普通 COM 口，
-  所以 VOFA+、串口助手可以像使用 UART 一样使用它。
+  所以 VOFA+ 可以直接连接。
 - 使用 USB-C 时，不需要外接 USB-TTL，也不需要设置真实波特率。VOFA+
   界面里的 `115200` 只是兼容字段，不会限制 USB 的实际速度。
 - ST-Link 负责调试和烧录；USB-C 负责给应用传输 IMU 数据，两者用途不同。
@@ -176,12 +173,10 @@ my_imu/
 │   ├── Inc/
 │   │   ├── main.h
 │   │   ├── spi.h
-│   │   ├── usart.h
 │   │   └── ...
 │   └── Src/
 │       ├── main.c
 │       ├── spi.c
-│       ├── usart.c
 │       └── ...
 ├── Device/
 │   └── BMI088/
@@ -193,9 +188,7 @@ my_imu/
 │   ├── lcd.h
 │   ├── lcdfont.h
 │   ├── usb_bsp.c
-│   ├── usb_bsp.h
-│   ├── uart_bsp.c
-│   └── uart_bsp.h
+│   └── usb_bsp.h
 ├── USB_DEVICE/
 │   ├── App/
 │   └── Target/
@@ -212,11 +205,10 @@ my_imu/
 
 - [main.c](./Core/Src/main.c)：DRDY 采样、环形缓冲区、时间戳和 LCD 低通显示
 - [BMI088driver.c](./Device/BMI088/BMI088driver.c)：BMI088 初始化、量程/输出率配置和原始数据读取
-- [usb_bsp.c](./User/usb_bsp.c)：FireWater 格式化、双缓冲和 CDC 批量发送
+- [usb_bsp.c](./User/usb_bsp.c)：FireWater 定点格式化和 CDC 包发送
 - [usb_device.c](./USB_DEVICE/App/usb_device.c)：USB CDC 设备初始化
 - [usbd_cdc_if.c](./USB_DEVICE/App/usbd_cdc_if.c)：CDC 端点接口
 - [usbd_conf.c](./USB_DEVICE/Target/usbd_conf.c)：USB PCD 底层适配
-- [usart.c](./Core/Src/usart.c)：保留的 USART1 后备配置
 - [lcd.c](./User/lcd.c)：ST7789 LCD 驱动
 - [my_imu.ioc](./my_imu.ioc)：STM32CubeMX 引脚和外设配置
 

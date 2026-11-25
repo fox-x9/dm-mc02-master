@@ -1,17 +1,60 @@
 #include "usb_bsp.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
-#include <stdio.h>
 
-#define USB_TX_BUFFER_SIZE     256U
-#define USB_TX_FLUSH_THRESHOLD 192U
-#define USB_LINE_MAX_SIZE      32U
+#define USB_TX_BUFFER_SIZE     32U
 
 extern USBD_HandleTypeDef hUsbDeviceHS;
 
-static uint8_t tx_buffers[2][USB_TX_BUFFER_SIZE];
-static uint8_t tx_write_index;
-static uint16_t tx_length;
+static uint8_t tx_buffer[USB_TX_BUFFER_SIZE];
+
+static uint16_t USB_BSP_AppendUnsigned(char *text, uint16_t index, uint32_t value)
+{
+    char digits[10];
+    uint8_t count = 0;
+
+    do
+    {
+        digits[count++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    }
+    while (value != 0U);
+
+    while (count > 0U)
+    {
+        text[index++] = digits[--count];
+    }
+    return index;
+}
+
+static uint16_t USB_BSP_AppendFixed3(char *text, uint16_t index, float value)
+{
+    int32_t scaled;
+    uint32_t magnitude;
+    uint32_t whole;
+    uint32_t fraction;
+
+    scaled = (int32_t)((value >= 0.0f) ? (value * 1000.0f + 0.5f)
+                                       : (value * 1000.0f - 0.5f));
+    if (scaled < 0)
+    {
+        text[index++] = '-';
+        magnitude = (uint32_t)(-scaled);
+    }
+    else
+    {
+        magnitude = (uint32_t)scaled;
+    }
+
+    whole = magnitude / 1000U;
+    fraction = magnitude % 1000U;
+    index = USB_BSP_AppendUnsigned(text, index, whole);
+    text[index++] = '.';
+    text[index++] = (char)('0' + (fraction / 100U));
+    text[index++] = (char)('0' + ((fraction / 10U) % 10U));
+    text[index++] = (char)('0' + (fraction % 10U));
+    return index;
+}
 
 static uint8_t USB_BSP_IsReady(void)
 {
@@ -19,63 +62,26 @@ static uint8_t USB_BSP_IsReady(void)
             (hUsbDeviceHS.pClassData != NULL));
 }
 
-static void USB_BSP_Flush(void)
-{
-    if (tx_length == 0U)
-    {
-        return;
-    }
-
-    if (!USB_BSP_IsReady())
-    {
-        tx_length = 0;
-        tx_write_index = 0;
-        return;
-    }
-
-    if (CDC_Transmit_HS(tx_buffers[tx_write_index], tx_length) == USBD_OK)
-    {
-        tx_write_index ^= 1U;
-        tx_length = 0;
-    }
-}
-
 void USB_BSP_Init(void)
 {
-    tx_write_index = 0;
-    tx_length = 0;
     MX_USB_DEVICE_Init();
 }
 
 void USB_BSP_SendAcceleration(const float accel_mps2[3])
 {
-    int length;
+    uint16_t index;
 
-    if (!USB_BSP_IsReady())
+    if (!USB_BSP_IsReady() || !CDC_TransmitReady_HS())
     {
-        tx_length = 0;
         return;
     }
 
-    if ((USB_TX_BUFFER_SIZE - tx_length) < USB_LINE_MAX_SIZE)
-    {
-        USB_BSP_Flush();
-        if ((USB_TX_BUFFER_SIZE - tx_length) < USB_LINE_MAX_SIZE)
-        {
-            return;
-        }
-    }
-
-    length = snprintf((char *)&tx_buffers[tx_write_index][tx_length],
-                      USB_TX_BUFFER_SIZE - tx_length,
-                      "%.3f,%.3f,%.3f\n",
-                      accel_mps2[0], accel_mps2[1], accel_mps2[2]);
-    if (length > 0)
-    {
-        tx_length += (uint16_t)length;
-        if (tx_length >= USB_TX_FLUSH_THRESHOLD)
-        {
-            USB_BSP_Flush();
-        }
-    }
+    index = 0;
+    index = USB_BSP_AppendFixed3((char *)tx_buffer, index, accel_mps2[0]);
+    tx_buffer[index++] = ',';
+    index = USB_BSP_AppendFixed3((char *)tx_buffer, index, accel_mps2[1]);
+    tx_buffer[index++] = ',';
+    index = USB_BSP_AppendFixed3((char *)tx_buffer, index, accel_mps2[2]);
+    tx_buffer[index++] = '\n';
+    (void)CDC_Transmit_HS(tx_buffer, index);
 }
