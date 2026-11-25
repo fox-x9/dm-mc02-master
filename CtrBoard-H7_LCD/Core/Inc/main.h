@@ -65,6 +65,8 @@ void Error_Handler(void);
 #define LCD_RES_GPIO_Port GPIOB
 #define LCD_DC_Pin GPIO_PIN_10
 #define LCD_DC_GPIO_Port GPIOD
+#define POWER_5V_Pin GPIO_PIN_15
+#define POWER_5V_GPIO_Port GPIOC
 
 /* USER CODE BEGIN Private defines */
 

@@ -3,7 +3,7 @@
 
 #include "main.h"
 
-#define USB_BSP_OUTPUT_RATE_HZ  1600U
+#define USB_BSP_OUTPUT_RATE_HZ  20U
 
 void USB_BSP_Init(void);
 void USB_BSP_SendAcceleration(const float accel_mps2[3]);

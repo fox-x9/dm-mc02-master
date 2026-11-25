@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32H723xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Device/BMI088/inc;../Device/BMI088;../User;../USB_DEVICE/App;../USB_DEVICE/Target;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Device/BMI088/inc;../Device/BMI088;../Devices/WS2812/inc;../User;../USB_DEVICE/App;../USB_DEVICE/Target;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -573,27 +573,17 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>LCD</GroupName>
+          <GroupName>Devices/WS2812</GroupName>
           <Files>
             <File>
-              <FileName>lcd.c</FileName>
+              <FileName>ws2812.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\lcd.c</FilePath>
+              <FilePath>..\Devices\WS2812\ws2812.c</FilePath>
             </File>
             <File>
-              <FileName>lcd.h</FileName>
+              <FileName>ws2812.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\lcd.h</FilePath>
-            </File>
-            <File>
-              <FileName>lcdfont.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\lcdfont.h</FilePath>
-            </File>
-            <File>
-              <FileName>pic.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\pic.h</FilePath>
+              <FilePath>..\Devices\WS2812\inc\ws2812.h</FilePath>
             </File>
           </Files>
         </Group>

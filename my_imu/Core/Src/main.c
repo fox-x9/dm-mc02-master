@@ -18,16 +18,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "dma.h"
-#include "spi.h"
 #include "gpio.h"
-#include <stdio.h>
+#include "spi.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "BMI088driver.h"
-#include "lcd.h"
-#include "usb_bsp.h"
+#include "ws2812.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,165 +55,8 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define IMU_RING_SIZE        512U
-#define IMU_RING_MASK        (IMU_RING_SIZE - 1U)
-#define IMU_LOW_PASS_HZ      2.0f
-#define LCD_REFRESH_MS       200U
-#define TIMER_CLOCK_HZ       240000000U
-#define TIM2_TICKS_PER_US    (TIMER_CLOCK_HZ / 1000000U)
-
-typedef struct
-{
-  uint32_t timestamp_us;
-  int16_t accel_raw[3];
-} IMU_Sample;
-
-static volatile IMU_Sample imu_ring[IMU_RING_SIZE];
-static volatile uint16_t imu_ring_head;
-static volatile uint16_t imu_ring_tail;
-static volatile uint32_t imu_dropped_samples;
-static volatile uint8_t imu_capture_enabled;
-
-static float low_pass_accel[3];
-static uint8_t low_pass_initialized;
-static uint64_t previous_sample_time_us;
-static float measured_sample_rate_hz = 1600.0f;
-
-static void IMU_TimestampTimer_Init(void)
-{
-  __HAL_RCC_TIM2_CLK_ENABLE();
-  TIM2->CR1 = 0;
-  TIM2->PSC = TIM2_TICKS_PER_US - 1U;
-  TIM2->ARR = 0xFFFFFFFFU;
-  TIM2->EGR = TIM_EGR_UG;
-  TIM2->CNT = 0;
-  TIM2->SR = 0;
-  TIM2->CR1 = TIM_CR1_CEN;
-}
-
-static uint64_t IMU_ExtendTimestamp(uint32_t raw_timestamp)
-{
-  static uint8_t initialized;
-  static uint32_t previous_raw_timestamp;
-  static uint64_t extended_timestamp_us;
-
-  if (!initialized)
-  {
-    initialized = 1;
-    extended_timestamp_us = raw_timestamp;
-  }
-  else
-  {
-    extended_timestamp_us += (uint32_t)(raw_timestamp - previous_raw_timestamp);
-  }
-
-  previous_raw_timestamp = raw_timestamp;
-  return extended_timestamp_us;
-}
-
-static void IMU_ConvertAcceleration(const IMU_Sample *sample, float accel[3])
-{
-  uint8_t axis;
-
-  for (axis = 0; axis < 3; axis++)
-  {
-    accel[axis] = sample->accel_raw[axis] * BMI088_ACCEL_6G_SEN;
-  }
-}
-
-static void IMU_UpdateLowPass(const float accel[3], uint64_t timestamp_us)
-{
-  float dt_s;
-  float rc;
-  float alpha;
-  uint8_t axis;
-
-  if (!low_pass_initialized)
-  {
-    for (axis = 0; axis < 3; axis++)
-    {
-      low_pass_accel[axis] = accel[axis];
-    }
-    low_pass_initialized = 1;
-    previous_sample_time_us = timestamp_us;
-    return;
-  }
-
-  dt_s = (float)(timestamp_us - previous_sample_time_us) * 0.000001f;
-  previous_sample_time_us = timestamp_us;
-  if (dt_s <= 0.0f)
-  {
-    return;
-  }
-
-  if ((dt_s >= 0.0001f) && (dt_s <= 0.005f))
-  {
-    float measured = 1.0f / dt_s;
-    measured_sample_rate_hz += 0.02f * (measured - measured_sample_rate_hz);
-  }
-
-  rc = 1.0f / (2.0f * 3.14159265f * IMU_LOW_PASS_HZ);
-  alpha = dt_s / (rc + dt_s);
-  for (axis = 0; axis < 3; axis++)
-  {
-    low_pass_accel[axis] += alpha * (accel[axis] - low_pass_accel[axis]);
-  }
-}
-
-static void LCD_ShowAcceleration(uint16_t y, float value, uint16_t color)
-{
-  char text[16];
-
-  snprintf(text, sizeof(text), "%+7.2f", value);
-  LCD_ShowString(88, y, (const uint8_t *)text, color, BLACK, 24, 0);
-}
-
-static void LCD_ShowIMUError(uint8_t error)
-{
-  char text[24];
-
-  snprintf(text, sizeof(text), "IMU ERROR: 0x%02X", error);
-  LCD_ShowString(24, 196, (const uint8_t *)text, RED, BLACK, 24, 0);
-}
-
-static void LCD_ShowLowPassData(void)
-{
-  char text[32];
-
-  LCD_ShowAcceleration(60, low_pass_accel[0], RED);
-  LCD_ShowAcceleration(104, low_pass_accel[1], GREEN);
-  LCD_ShowAcceleration(148, low_pass_accel[2], BLUE);
-
-  snprintf(text, sizeof(text), "FS:%4.0fHz DROP:%lu",
-           measured_sample_rate_hz, (unsigned long)imu_dropped_samples);
-  LCD_ShowString(8, 214, (const uint8_t *)text, WHITE, BLACK, 16, 0);
-}
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-  int16_t accel_raw[3];
-  uint16_t next_head;
-
-  if ((GPIO_Pin != ACC_INT_Pin) || !imu_capture_enabled)
-  {
-    return;
-  }
-
-  next_head = (imu_ring_head + 1U) & IMU_RING_MASK;
-  if (next_head == imu_ring_tail)
-  {
-    imu_dropped_samples++;
-    return;
-  }
-
-  BMI088_read_acceleration(accel_raw);
-  imu_ring[imu_ring_head].timestamp_us = TIM2->CNT;
-  imu_ring[imu_ring_head].accel_raw[0] = accel_raw[0];
-  imu_ring[imu_ring_head].accel_raw[1] = accel_raw[1];
-  imu_ring[imu_ring_head].accel_raw[2] = accel_raw[2];
-  __DMB();
-  imu_ring_head = next_head;
-}
+#define WS2812_TEST_LEVEL  16U
+#define WS2812_TEST_DELAY  500U
 /* USER CODE END 0 */
 
 /**
@@ -248,79 +87,31 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  USB_BSP_Init();
-  MX_DMA_Init();
-  MX_SPI1_Init();
-  MX_SPI2_Init();
+  // USB_BSP_Init();
   /* USER CODE BEGIN 2 */
-    LCD_Init();
-    LCD_Fill(0, 0, LCD_W, LCD_H, BLACK);
-    LCD_ShowString(32, 12, (const uint8_t *)"BMI088 LPF m/s^2", CYAN, BLACK, 24, 0);
-    LCD_DrawLine(12, 44, LCD_W - 12, 44, GRAY);
-    LCD_ShowString(36, 60, (const uint8_t *)"X:", RED, BLACK, 24, 0);
-    LCD_ShowString(36, 104, (const uint8_t *)"Y:", GREEN, BLACK, 24, 0);
-    LCD_ShowString(36, 148, (const uint8_t *)"Z:", BLUE, BLACK, 24, 0);
+    MX_SPI6_Init();
 
-    uint8_t imu_error;
-    while((imu_error = BMI088_init()) != BMI088_NO_ERROR)
-    {
-        LCD_ShowIMUError(imu_error);
-        HAL_Delay(500);
-    }
-    LCD_Fill(0, 194, LCD_W, LCD_H, BLACK);
-
-    IMU_TimestampTimer_Init();
-    __HAL_GPIO_EXTI_CLEAR_IT(ACC_INT_Pin | GYRO_INT_Pin);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-    imu_capture_enabled = 1;
+    // MX_DMA_Init();
+    // MX_SPI2_Init();
+    // while(BMI088_init() != BMI088_NO_ERROR) {}
+    WS2812_Ctrl(0U, 0U, 0U);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t last_display_tick = HAL_GetTick() - LCD_REFRESH_MS;
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-        uint8_t processed_sample = 0;
-        while (imu_ring_tail != imu_ring_head)
-        {
-            IMU_Sample sample;
-            uint16_t tail = imu_ring_tail;
-            uint64_t timestamp_us;
-            float accel_mps2[3];
-
-            sample.timestamp_us = imu_ring[tail].timestamp_us;
-            sample.accel_raw[0] = imu_ring[tail].accel_raw[0];
-            sample.accel_raw[1] = imu_ring[tail].accel_raw[1];
-            sample.accel_raw[2] = imu_ring[tail].accel_raw[2];
-            __DMB();
-            imu_ring_tail = (tail + 1U) & IMU_RING_MASK;
-
-            timestamp_us = IMU_ExtendTimestamp(sample.timestamp_us);
-            IMU_ConvertAcceleration(&sample, accel_mps2);
-            IMU_UpdateLowPass(accel_mps2, timestamp_us);
-            USB_BSP_SendAcceleration(accel_mps2);
-            processed_sample = 1;
-        }
-
-        if ((HAL_GetTick() - last_display_tick) >= LCD_REFRESH_MS)
-        {
-            last_display_tick = HAL_GetTick();
-            LCD_ShowLowPassData();
-        }
-
-        if (!processed_sample)
-        {
-            __disable_irq();
-            if (imu_ring_tail == imu_ring_head)
-            {
-                __WFI();
-            }
-            __enable_irq();
-        }
+        WS2812_Ctrl(WS2812_TEST_LEVEL, 0U, 0U);
+        HAL_Delay(WS2812_TEST_DELAY);
+        WS2812_Ctrl(0U, WS2812_TEST_LEVEL, 0U);
+        HAL_Delay(WS2812_TEST_DELAY);
+        WS2812_Ctrl(0U, 0U, WS2812_TEST_LEVEL);
+        HAL_Delay(WS2812_TEST_DELAY);
+        WS2812_Ctrl(0U, 0U, 0U);
+        HAL_Delay(WS2812_TEST_DELAY);
   }
   /* USER CODE END 3 */
 }

@@ -244,15 +244,6 @@ void SPI2_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles EXTI line 15:10 interrupts.
-  */
-void EXTI15_10_IRQHandler(void)
-{
-  HAL_GPIO_EXTI_IRQHandler(ACC_INT_Pin);
-  HAL_GPIO_EXTI_IRQHandler(GYRO_INT_Pin);
-}
-
-/**
   * @brief This function handles USB On-The-Go HS global interrupt.
   */
 void OTG_HS_IRQHandler(void)
