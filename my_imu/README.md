@@ -4,7 +4,7 @@ STM32H723VGTx + BMI088 三轴加速度采集工程。
 
 - BMI088 加速度计采样率：`1600 Hz`
 - USB-C CDC 输出：X/Y/Z 三个 `float`，VOFA+ `JustFloat`
-- LCD：分别显示 X/Y/Z 三轴加速度绝对值和强度条
+- LCD：分别显示 X/Y/Z 三轴振动 RMS 和强度条
 - LCD 刷新率：`10 Hz`
 - WS2812：绿色 `1 Hz` 心跳表示系统运行
 - 不采集、不输出陀螺仪数据
@@ -46,11 +46,28 @@ TIM2 每 625 us 触发一次
 ## LCD 显示
 
 - 逻辑分辨率：`280 x 240`，横屏
-- X、Y、Z 三行分别显示绝对加速度数值和红、绿、青三色强度条
+- X、Y、Z 三行分别显示振动 RMS 和红、绿、青三色强度条
 - 强度条量程：`0~60 m/s²`
 - 没有 USB 连接时仍可使用 LCD 单独观察三轴强度
 
 LCD 使用 SPI1，与 BMI088 的 SPI2 相互独立。
+
+## LCD 启动顺序
+
+当前硬件已验证的稳定顺序为：
+
+1. `MX_GPIO_Init()`，PC15 输出高电平，`LCD_CS` 初始低电平。
+2. `MX_SPI1_Init()`。
+3. `AccelDisplay_Init()` 完成 LCD 初始化和首屏绘制。
+4. 初始化 SPI6、SPI2、BMI088 和 USB。
+5. 最后启动 TIM2 的 IMU 采样中断。
+
+不要在 LCD 初始化前启动 IMU 定时器或 USB，也不要移动
+`AccelDisplay_Init()` 到其他外设初始化之后，否则 LCD 可能偶发黑屏。
+
+`my_imu/Bsp/LCD/lcd.c` 与官方 `CtrBoard-H7_LCD/User/lcd.c` 保持一致。
+ST7789 硬件复位后不能省略 `SLPOUT (0x11)`；删除该命令会导致只有背光、
+没有图像。首次启动时可能出现一次短暂闪屏，属于正常现象。
 
 ## 状态灯
 
@@ -77,7 +94,10 @@ LCD 使用 SPI1，与 BMI088 的 SPI2 相互独立。
 | LCD_DC | PD10 |
 | LCD_RES | PB11 |
 | LCD_BLK | PB10 |
-| LCD/WS2812 5V 使能 | PC15 |
+| Power_5V_EN（外部 VCC_IN 5V 转换使能） | PC15 |
+
+仅接 USB-C 时，LCD 的 `VCC_5VS` 由 USB-C `VBUS` 经 `D14` 提供，
+不由 PC15 直接控制。
 
 ## 目录结构
 

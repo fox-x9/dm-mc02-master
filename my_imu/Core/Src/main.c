@@ -135,23 +135,21 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
+    MX_SPI1_Init();
+    AccelDisplay_Init();
+
     MX_SPI6_Init();
     MX_SPI2_Init();
-    MX_SPI1_Init();
 
     if (bmi088_accel_init() != BMI088_NO_ERROR)
     {
-        HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_SET);
         WS2812_Ctrl(LED_BRIGHTNESS, 0U, 0U);
         Error_Handler();
     }
 
     USB_BSP_Init();
     HAL_Delay(300U);
-    HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_SET);
-    HAL_Delay(50U);
     WS2812_Ctrl(0U, LED_BRIGHTNESS, 0U);
-    AccelDisplay_Init();
     IMU_SampleTimer_Init();
   /* USER CODE END 2 */
 
