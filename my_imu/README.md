@@ -2,7 +2,8 @@
 
 STM32H723VGTx + BMI088 三轴加速度采集工程。当前调试模式：
 
-- BMI088 加速度输出率固定为 `200 Hz`
+- BMI088 加速度计配置为 `800 Hz`
+- USB 输出率固定为 `500 Hz`
 - 通过 USB-C CDC 虚拟串口发送 X/Y/Z 三轴加速度
 - 板载 WS2812 使用绿色 `1 Hz` 心跳指示系统运行
 - LCD 不初始化、不刷新
@@ -28,22 +29,16 @@ VOFA+ 中选择 `JustFloat` 和对应 COM 口。
 ## 数据流
 
 ```text
-BMI088 ACC_DRDY (PE10)
+TIM2 2 ms period
         |
         v
-EXTI15_10_IRQHandler
-        |
-        v
-读取 ax/ay/az 原始值
-        |
-        v
-64 点环形缓冲区
+读取 BMI088 最新 ax/ay/az 原始值
         |
         v
 main loop -> USB-C CDC -> JustFloat(ax, ay, az)
 ```
 
-DRDY 中断只负责读取传感器和写入环形缓冲区；USB 发送在主循环中完成。
+TIM2 以 1 MHz 计数，主循环每 2 ms 读取一次最新加速度并通过 USB 发送。
 
 ## 状态灯
 
@@ -63,7 +58,6 @@ WS2812 由 `SPI6_MOSI (PA7)` 驱动，5V 可控电源由 `PC15` 使能。
 | BMI088 SPI2_MISO | PC2_C |
 | BMI088 SPI2_MOSI | PC1 |
 | BMI088 ACC_CS | PC0 |
-| BMI088 ACC_DRDY | PE10 |
 | USB_DM | PA11 |
 | USB_DP | PA12 |
 | WS2812 | PA7 / SPI6_MOSI |
@@ -73,8 +67,8 @@ WS2812 由 `SPI6_MOSI (PA7)` 驱动，5V 可控电源由 `PC15` 使能。
 
 ## 主要文件
 
-- `Core/Src/main.c`：采样中断、64 点环形缓冲、USB 发送和 LED 心跳
-- `Device/BMI088/BMI088driver.c`：BMI088 初始化、`±6 g` 量程和 `200 Hz` 输出率
+- `Core/Src/main.c`：TIM2 定时采样、USB 发送和 LED 心跳
+- `Device/BMI088/BMI088driver.c`：BMI088 初始化、`±6 g` 量程和 `800 Hz` 采样率
 - `User/usb_bsp.c`：JustFloat 组帧和 CDC 发送
 - `Devices/WS2812/ws2812.c`：SPI6 驱动 WS2812
 

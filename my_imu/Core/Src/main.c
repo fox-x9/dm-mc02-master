@@ -44,8 +44,10 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define IMU_RING_SIZE        64U
-#define IMU_RING_MASK        (IMU_RING_SIZE - 1U)
+#define IMU_OUTPUT_RATE_HZ   500U
+#define IMU_PERIOD_US        (1000000U / IMU_OUTPUT_RATE_HZ)
+#define TIM2_CLOCK_HZ        240000000U
+#define TIM2_TICKS_PER_US    (TIM2_CLOCK_HZ / 1000000U)
 #define LED_HEARTBEAT_MS     500U
 #define LED_BRIGHTNESS       16U
 /* USER CODE END PM */
@@ -53,9 +55,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-static volatile int16_t imu_accel_raw[IMU_RING_SIZE][3];
-static volatile uint16_t imu_ring_head;
-static volatile uint16_t imu_ring_tail;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -66,28 +66,16 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+static void IMU_SampleTimer_Init(void)
 {
-  int16_t accel_raw[3];
-  uint16_t next_head;
-
-  if (GPIO_Pin != ACC_INT_Pin)
-  {
-    return;
-  }
-
-  next_head = (imu_ring_head + 1U) & IMU_RING_MASK;
-  if (next_head == imu_ring_tail)
-  {
-    return;
-  }
-
-  BMI088_read_acceleration(accel_raw);
-  imu_accel_raw[imu_ring_head][0] = accel_raw[0];
-  imu_accel_raw[imu_ring_head][1] = accel_raw[1];
-  imu_accel_raw[imu_ring_head][2] = accel_raw[2];
-  __DMB();
-  imu_ring_head = next_head;
+  __HAL_RCC_TIM2_CLK_ENABLE();
+  TIM2->CR1 = 0U;
+  TIM2->PSC = TIM2_TICKS_PER_US - 1U;
+  TIM2->ARR = 0xFFFFFFFFU;
+  TIM2->EGR = TIM_EGR_UG;
+  TIM2->CNT = 0U;
+  TIM2->SR = 0U;
+  TIM2->CR1 = TIM_CR1_CEN;
 }
 /* USER CODE END 0 */
 
@@ -130,9 +118,7 @@ int main(void)
         Error_Handler();
     }
 
-    __HAL_GPIO_EXTI_CLEAR_IT(ACC_INT_Pin);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1U, 0U);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    IMU_SampleTimer_Init();
     USB_BSP_Init();
     HAL_Delay(300U);
     HAL_GPIO_WritePin(POWER_OUT5V_GPIO_Port, POWER_OUT5V_Pin, GPIO_PIN_SET);
@@ -142,6 +128,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t last_sample_us = TIM2->CNT;
   uint32_t led_tick = HAL_GetTick();
   uint8_t led_on = 1U;
   while (1)
@@ -149,21 +136,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-        uint8_t processed_sample = 0U;
-
-        while (imu_ring_tail != imu_ring_head)
+        uint32_t now_us = TIM2->CNT;
+        if ((uint32_t)(now_us - last_sample_us) >= IMU_PERIOD_US)
         {
-            uint16_t tail = imu_ring_tail;
+            int16_t accel_raw[3];
             float accel_mps2[3];
 
-            accel_mps2[0] = imu_accel_raw[tail][0] * BMI088_ACCEL_6G_SEN;
-            accel_mps2[1] = imu_accel_raw[tail][1] * BMI088_ACCEL_6G_SEN;
-            accel_mps2[2] = imu_accel_raw[tail][2] * BMI088_ACCEL_6G_SEN;
-            __DMB();
-            imu_ring_tail = (tail + 1U) & IMU_RING_MASK;
+            last_sample_us += IMU_PERIOD_US;
+            BMI088_read_acceleration(accel_raw);
+            accel_mps2[0] = accel_raw[0] * BMI088_ACCEL_6G_SEN;
+            accel_mps2[1] = accel_raw[1] * BMI088_ACCEL_6G_SEN;
+            accel_mps2[2] = accel_raw[2] * BMI088_ACCEL_6G_SEN;
 
             USB_BSP_SendAcceleration(accel_mps2);
-            processed_sample = 1U;
         }
 
         if ((HAL_GetTick() - led_tick) >= LED_HEARTBEAT_MS)
@@ -173,10 +158,6 @@ int main(void)
             WS2812_Ctrl(0U, led_on ? LED_BRIGHTNESS : 0U, 0U);
         }
 
-        if (!processed_sample)
-        {
-            __NOP();
-        }
   }
   /* USER CODE END 3 */
 }
